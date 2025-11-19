@@ -1,26 +1,23 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-
-const EMS_BG = "linear-gradient(120deg, #ece9ff 0%, #fdf6fa 65%, #faf7ff 99%)";
-const CARD = "rgba(255,255,255,0.98)";
-const COLORS = { accent: "#8447fb", accent2: "#387efb", accent3: "#19b37a", border: "#e2e4f0" };
+import {
+  LogOut,
+  FilePlus2,
+  NotebookPen,
+  Calendar,
+  Loader2,
+} from "lucide-react";
+import PageBackground from "../components/ui/PageBackground";
 
 function Modal({ children, onClose }) {
   return (
-    <div style={{
-      position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
-      background: "rgba(0,0,0,0.21)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000
-    }}>
-      <div style={{
-        minWidth: 370, maxWidth: 600, background: CARD, borderRadius: 16, boxShadow: "0 6px 40px #387efb21",
-        position: "relative", padding: "34px 27px"
-      }}>
-        <button onClick={onClose}
-          style={{
-            position: "absolute", top: 13, right: 13, background: "#ede7fa", color: COLORS.accent,
-            border: "none", borderRadius: 8, fontWeight: 700, fontSize: "1.09rem", cursor: "pointer", padding: "4px 12px"
-          }}>
-          ✕
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-8 backdrop-blur-md">
+      <div className="glass-panel relative w-full max-w-2xl rounded-[32px] px-8 py-8">
+        <button
+          onClick={onClose}
+          className="absolute right-6 top-6 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10"
+        >
+          Close
         </button>
         {children}
       </div>
@@ -35,164 +32,260 @@ export default function EmployeeProject() {
   const [progressHistory, setProgressHistory] = useState([]);
   const [showReport, setShowReport] = useState(false);
   const [reportText, setReportText] = useState("");
+  const [completionPercentage, setCompletionPercentage] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
 
-  // Logout function
   const logout = async () => {
     try {
       const apiBase = "http://localhost:5000";
-      await fetch(`${apiBase}/api/auth/logout`, { method: "POST", credentials: "include" });
-    } catch (e) { /* ignore */ }
+      await fetch(`${apiBase}/api/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch (e) {
+      /* ignore */
+    }
     navigate("/");
-  }
+  };
 
   useEffect(() => {
     const apiBase = "http://localhost:5000";
 
     fetch(`${apiBase}/api/projects`, { credentials: "include" })
-      .then(res => res.json())
-      .then(data => {
-        const proj = (data.projects || []).find(x => x._id === id);
-        if (proj) setProject(proj);
+      .then((res) => res.json())
+      .then((data) => {
+        const proj = (data.projects || []).find((x) => x._id === id);
+        if (proj) {
+          setProject(proj);
+          setCompletionPercentage(proj.completionPercentage || 0);
+        }
       });
 
     fetch(`${apiBase}/api/progress/${id}`, { credentials: "include" })
-      .then(async res => {
+      .then(async (res) => {
         if (!res.ok) {
-          return setProgressHistory([]);
+          setProgressHistory([]);
+          return null;
         }
         return res.json();
       })
-      .then(data => setProgressHistory(data?.progress || []));
+      .then((data) => data && setProgressHistory(data?.progress || []));
   }, [id]);
 
-  // Submit daily progress report
   const submitReport = async (e) => {
     e.preventDefault();
-
+    setSubmitting(true);
     const apiBase = "http://localhost:5000";
 
     const resp = await fetch(`${apiBase}/api/progress/${id}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ text: reportText }),
+      body: JSON.stringify({ 
+        text: reportText,
+        completionPercentage: completionPercentage 
+      }),
     });
+    setSubmitting(false);
 
     if (resp.ok) {
       setReportText("");
       setShowReport(false);
-      // Refresh progress history after successful submission
+      // Refresh project to get updated completion percentage
+      fetch(`${apiBase}/api/projects`, { credentials: "include" })
+        .then((res) => res.json())
+        .then((data) => {
+          const proj = (data.projects || []).find((x) => x._id === id);
+          if (proj) {
+            setProject(proj);
+            setCompletionPercentage(proj.completionPercentage || 0);
+          }
+        });
       fetch(`${apiBase}/api/progress/${id}`, { credentials: "include" })
-        .then(res => res.json())
-        .then(data => setProgressHistory(data?.progress || []))
-        .catch(err => console.error('Error refreshing progress:', err));
+        .then((res) => res.json())
+        .then((data) => setProgressHistory(data?.progress || []));
     } else {
       const errMsg = await resp.json();
-      console.error('Submit failed:', resp.status, errMsg);
+      console.error("Submit failed:", resp.status, errMsg);
     }
   };
 
-  if (!project) return (
-    <div style={{ minHeight: "100vh", width: "100vw", background: EMS_BG, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ fontWeight: 700, fontSize: "1.2rem", color: COLORS.accent }}>Loading...</div>
-    </div>
-  );
+  if (!project) {
+    return (
+      <PageBackground variant="emerald">
+        <div className="flex min-h-screen items-center justify-center text-white">
+          Loading project...
+        </div>
+      </PageBackground>
+    );
+  }
 
   return (
-    <div style={{
-      minHeight: "100vh", width: "100vw", background: EMS_BG,
-      padding: 0, margin: 0
-    }}>
-      {/* Top Navbar */}
-      <div style={{
-        height: 75, background: "#ffffffdd", borderBottom: `1px solid ${COLORS.border}`,
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "0 40px", boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
-        fontSize: "1.35rem", fontWeight: 800, color: COLORS.accent
-      }}>
-        <span>Project Progress</span>
-        <button
-          onClick={logout}
-          style={{
-            background: "#eee8ff", color: COLORS.accent, border: "none",
-            borderRadius: 12, padding: "9px 26px", fontWeight: 700,
-            cursor: "pointer", fontSize: "1.01rem", boxShadow: "0 2px 8px #8447fb15"
-          }}>
-          Logout
-        </button>
-      </div>
-      <div style={{
-        maxWidth: 830, margin: "40px auto",
-        background: CARD, borderRadius: 22, boxShadow: "0 4px 22px #387efb10",
-        padding: "38px 33px 30px 33px"
-      }}>
-        <div style={{ fontWeight: 800, fontSize: "1.38rem", color: COLORS.accent2 }}>{project?.projectName}</div>
-        <div style={{ fontWeight: 700, marginBottom: 6, color: COLORS.accent3 }}>
-          Client: <span style={{ fontWeight: 500, color: "#555" }}>{project?.clientName}</span>
-        </div>
-        <div style={{
-          color: "#666", fontWeight: 600, marginBottom: 26,
-        }}>{project?.description}</div>
-        <button
-          style={{
-            background: COLORS.accent2, color: "#fff", border: "none",
-            borderRadius: 14, fontWeight: 700, padding: "10px 38px",
-            fontSize: "1.11rem", margin: "15px 0 26px 0",
-            boxShadow: "0 3px 12px #387efb22", cursor: "pointer"
-          }}
-          onClick={() => setShowReport(true)}
-        >
-          + Add Today's Work Report
-        </button>
-
-        <div style={{ marginTop: 24 }}>
-          <div style={{ fontWeight: 800, color: COLORS.accent, fontSize: "1.15rem", marginBottom: 15 }}>
-            Progress History
+    <PageBackground variant="emerald">
+      <div className="mx-auto min-h-screen w-full max-w-4xl px-6 pb-20 pt-10 text-white">
+        <header className="glass-panel flex flex-col gap-6 rounded-[32px] px-7 py-8 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.6em] text-emerald-200/80">
+              Project progress
+            </p>
+            <h1 className="mt-2 text-3xl font-bold">{project.projectName}</h1>
+            <p className="text-sm text-slate-200">{project.clientName}</p>
           </div>
-          {progressHistory.length === 0 && (
-            <div style={{ padding: 12, color: "#999", fontWeight: 600 }}>No reports yet.</div>
-          )}
-          {progressHistory.map((progress, idx) => (
-            <div key={progress._id || idx} style={{
-              marginBottom: 21, background: "#edefff88", padding: "13px 15px",
-              borderRadius: 10, boxShadow: "0 2px 12px #8447fb20"
-            }}>
-              <div style={{ fontWeight: 700, color: COLORS.accent2 }}>
-                {progress.employee?.name || "Employee"} ({new Date(progress.date).toLocaleDateString()})
-              </div>
-              <div style={{ fontSize: "1.01rem", color: "#333" }}>{progress.text}</div>
+          <div className="flex flex-wrap gap-3">
+            <button
+              className="btn-primary bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500"
+              onClick={() => setShowReport(true)}
+            >
+              <FilePlus2 className="mr-2 h-4 w-4" />
+              Add report
+            </button>
+            <button className="btn-ghost" onClick={logout}>
+              <LogOut className="mr-2 h-4 w-4" />
+              Logout
+            </button>
+          </div>
+        </header>
+
+        <section className="mt-10 rounded-[32px] border border-white/10 bg-white/5 p-8 text-slate-200">
+          <div className="flex flex-wrap items-center gap-4 text-sm">
+            <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/30 px-4 py-2">
+              <NotebookPen className="h-4 w-4" />
+              {project.status}
+            </span>
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/10 px-4 py-2">
+              <Calendar className="h-4 w-4" />
+              {project.startDate
+                ? new Date(project.startDate).toLocaleDateString()
+                : "No start"}{" "}
+              →{" "}
+              {project.endDate
+                ? new Date(project.endDate).toLocaleDateString()
+                : "No end"}
+            </span>
+          </div>
+          <p className="mt-4 text-base text-slate-100">{project.description}</p>
+          
+          {/* Completion Percentage Display */}
+          <div className="mt-6">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-sm font-semibold text-slate-300">Project Completion</span>
+              <span className="text-lg font-bold text-emerald-300">
+                {project.completionPercentage || 0}%
+              </span>
             </div>
-          ))}
-        </div>
+            <div className="h-3 w-full rounded-full bg-white/10">
+              <div
+                className="h-3 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all duration-300"
+                style={{ width: `${project.completionPercentage || 0}%` }}
+              />
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-10">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.6em] text-slate-400">
+                Activity
+              </p>
+              <h2 className="text-2xl font-semibold text-white">
+                Progress History
+              </h2>
+            </div>
+            <span className="rounded-full border border-white/10 px-4 py-2 text-sm text-slate-200">
+              {progressHistory.length} updates
+            </span>
+          </div>
+
+          <div className="mt-6 space-y-5">
+            {!progressHistory.length && (
+              <div className="rounded-[24px] border border-white/10 bg-white/5 px-6 py-8 text-center text-slate-200">
+                No reports yet. Add your first update today.
+              </div>
+            )}
+            {progressHistory.map((progress) => (
+              <div
+                key={progress._id}
+                className="rounded-[24px] border border-emerald-400/20 bg-emerald-400/5 px-6 py-5 text-slate-100"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="text-base font-semibold text-white">
+                    {progress.employee?.name || "You"}
+                  </div>
+                  <div className="text-sm text-slate-300">
+                    {new Date(progress.date).toLocaleDateString()}
+                  </div>
+                </div>
+                <p className="mt-2 text-sm text-slate-200">{progress.text}</p>
+              </div>
+            ))}
+          </div>
+        </section>
       </div>
-      {showReport &&
+
+      {showReport && (
         <Modal onClose={() => setShowReport(false)}>
-          <h2 style={{ color: COLORS.accent2, marginBottom: 14 }}>Add Today's Work</h2>
-          <form onSubmit={submitReport}>
+          <h2 className="text-2xl font-semibold text-white">Add today's work</h2>
+          <p className="mt-1 text-sm text-slate-300">
+            Share highlights, blockers, or new learning.
+          </p>
+          <form onSubmit={submitReport} className="mt-6 space-y-6">
+            {/* Completion Percentage Slider */}
+            <div>
+              <div className="mb-3 flex items-center justify-between">
+                <label className="text-sm font-semibold text-white">
+                  Work Completion Percentage
+                </label>
+                <span className="text-lg font-bold text-emerald-300">
+                  {completionPercentage}%
+                </span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                value={completionPercentage}
+                onChange={(e) => setCompletionPercentage(Number(e.target.value))}
+                className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-white/10 accent-emerald-500"
+                style={{
+                  background: `linear-gradient(to right, rgb(16, 185, 129) 0%, rgb(16, 185, 129) ${completionPercentage}%, rgba(255, 255, 255, 0.1) ${completionPercentage}%, rgba(255, 255, 255, 0.1) 100%)`
+                }}
+              />
+              <div className="mt-2 flex justify-between text-xs text-slate-400">
+                <span>0%</span>
+                <span>25%</span>
+                <span>50%</span>
+                <span>75%</span>
+                <span>100%</span>
+              </div>
+            </div>
+
             <textarea
               rows={6}
               value={reportText}
               required
-              onChange={e => setReportText(e.target.value)}
-              style={{
-                borderRadius: 11, border: `1.5px solid ${COLORS.border}`,
-                padding: "11px 12px", background: "#f5f5fe",
-                fontWeight: 500, fontSize: "1.06rem", width: "100%", minWidth: 330, marginBottom: 24
-              }}
+              onChange={(e) => setReportText(e.target.value)}
               placeholder="Describe today's progress..."
+              className="input-field resize-none bg-white/10"
             />
             <button
               type="submit"
-              style={{
-                background: COLORS.accent2, color: "#fff", border: "none", padding: "10px 32px",
-                borderRadius: 11, fontWeight: 700, fontSize: "1.06rem", boxShadow: "0 2px 8px #387efb13"
-              }}>
-              Save
+              className="btn-primary w-full justify-center bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500"
+              disabled={submitting}
+            >
+              {submitting ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Saving...
+                </span>
+              ) : (
+                "Save progress"
+              )}
             </button>
           </form>
         </Modal>
-      }
-    </div>
+      )}
+    </PageBackground>
   );
 }
-

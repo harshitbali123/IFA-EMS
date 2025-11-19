@@ -1,26 +1,100 @@
 import React, { useState, useEffect } from "react";
-const EMS_BG = "linear-gradient(120deg,#ede7fe 0%, #f6f7fa 57%, #e8e9ff 100%)";
-const CARD = "rgba(255,255,255,0.98)";
-const BORDER = "#e4e1f8";
-const COLORS = {
-  accent: "#7659e7",
-  accent2: "#26a9e0",
-  success: "#12b48b",
-  reject: "#e26c5c",
-  faded: "#8577bc",
-  pending: "#dbad4c",
-};
+import { MessageCircle, Send, Users } from "lucide-react";
+import PageBackground from "../components/ui/PageBackground";
 
 export default function AdminMessagesPage() {
   const [employees, setEmployees] = useState([]);
+  const [clients, setClients] = useState([]);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [selectedClient, setSelectedClient] = useState(null);
+  const [activeTab, setActiveTab] = useState("employees"); // "employees" or "clients"
   const [chatMessages, setChatMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [multiSelected, setMultiSelected] = useState([]);
   const [multiMessage, setMultiMessage] = useState("");
+
+  useEffect(() => {
+    fetch("/api/messages/employees", { credentials: "include" })
+      .then((res) => res.json())
+      .then((data) => setEmployees(data.employees || []));
+    
+    fetch("/api/messages/clients", { credentials: "include" })
+      .then((res) => res.json())
+      .then((data) => setClients(data.clients || []));
+  }, []);
+
   const handleMultiSelect = (id) => {
-    setMultiSelected(prev => prev.includes(id) ? prev.filter(eid => eid !== id) : [...prev, id]);
+    setMultiSelected((prev) =>
+      prev.includes(id) ? prev.filter((eid) => eid !== id) : [...prev, id],
+    );
+  };
+
+  const fetchChat = async (employeeId) => {
+    const res = await fetch(`/api/messages/admin/chat/${employeeId}`, {
+      credentials: "include",
+    });
+    const data = await res.json();
+    setChatMessages(data.messages || []);
+  };
+
+  const fetchClientChat = async (clientId) => {
+    const res = await fetch(`/api/messages/admin/client-chat/${clientId}`, {
+      credentials: "include",
+    });
+    const data = await res.json();
+    setChatMessages(data.messages || []);
+  };
+
+  const handleSelectEmployee = (employee) => {
+    setSelectedEmployee(employee);
+    setSelectedClient(null);
+    fetchChat(employee._id);
+  };
+
+  const handleSelectClient = (client) => {
+    setSelectedClient(client);
+    setSelectedEmployee(null);
+    fetchClientChat(client._id);
+  };
+
+  const sendMessage = async () => {
+    if (!newMessage.trim() || (!selectedEmployee && !selectedClient)) return;
+    setSending(true);
+    let res;
+    if (selectedEmployee) {
+      res = await fetch("/api/messages/admin/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          content: newMessage,
+          employeeId: selectedEmployee._id,
+        }),
+      });
+      if (res.ok) {
+        setNewMessage("");
+        fetchChat(selectedEmployee._id);
+      }
+    } else if (selectedClient) {
+      res = await fetch("/api/messages/admin/send-to-client", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          content: newMessage,
+          clientId: selectedClient._id,
+        }),
+      });
+      if (res.ok) {
+        setNewMessage("");
+        fetchClientChat(selectedClient._id);
+      }
+    }
+    setSending(false);
+    if (!res || !res.ok) {
+      alert("Failed to send message.");
+    }
   };
 
   const sendMultiMessage = async () => {
@@ -30,7 +104,10 @@ export default function AdminMessagesPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ content: multiMessage, employeeIds: multiSelected }),
+      body: JSON.stringify({
+        content: multiMessage,
+        employeeIds: multiSelected,
+      }),
     });
     setSending(false);
     if (res.ok) {
@@ -42,98 +119,213 @@ export default function AdminMessagesPage() {
     }
   };
 
-  useEffect(() => {
-    fetch("/api/messages/employees", { credentials: "include" })
-      .then((res) => res.json())
-      .then((data) => setEmployees(data.employees || []));
-  }, []);
-
-  const fetchChat = async (employeeId) => {
-    const res = await fetch(`/api/messages/admin/chat/${employeeId}`, { credentials: "include" });
-    const data = await res.json();
-    setChatMessages(data.messages || []);
-  };
-
-  const handleSelectEmployee = (employee) => {
-    setSelectedEmployee(employee);
-    fetchChat(employee._id);
-  };
-
-  const sendMessage = async () => {
-    if (!newMessage.trim() || !selectedEmployee) return;
-    setSending(true);
-    const res = await fetch("/api/messages/admin/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ content: newMessage, employeeId: selectedEmployee._id }),
-    });
-    setSending(false);
-    if (res.ok) {
-      setNewMessage("");
-      fetchChat(selectedEmployee._id);
-    } else {
-      alert("Failed to send message.");
-    }
-  };
-
   return (
-    <div style={{ minHeight: "100vh", width: "100vw", background: EMS_BG, fontFamily: "Inter, 'Segoe UI', Arial, sans-serif" }}>
-      <div style={{ height: 75, background: "#fff", borderBottom: `1.5px solid ${BORDER}`,
-        display: "flex", alignItems: "center", padding: "0 55px", fontSize: "2.17rem", fontWeight: 900, color: COLORS.accent }}>
-        Employee Messaging
-      </div>
-      <div style={{ maxWidth: 1100, margin: "44px auto", padding: "0 22px" }}>
-        <div style={{ fontWeight: 800, fontSize: "1.45rem", color: COLORS.accent2, marginBottom: "2.3rem" }}>
-          All Employees
-        </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 18, marginBottom: 38 }}>
-          {employees.map(emp => (
-            <div key={emp._id} style={{ background: CARD, borderRadius: 14, boxShadow: "0 2px 8px #d2d3f621", padding: "14px 18px", border: `1px solid ${BORDER}`, minWidth: 220, display: "flex", alignItems: "center", gap: 12, cursor: "pointer", outline: selectedEmployee?._id === emp._id ? `2px solid ${COLORS.accent2}` : "none" }}>
-              <input type="checkbox" checked={multiSelected.includes(emp._id)} onChange={() => handleMultiSelect(emp._id)} style={{ marginRight: 8 }} />
-              <div onClick={() => handleSelectEmployee(emp)} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <img src={emp.picture || "https://via.placeholder.com/38?text=User"} alt={emp.name || "User"} style={{ width: 38, height: 38, borderRadius: "50%", marginRight: 8, objectFit: "cover" }} />
-                <div>
-                  <div style={{ fontWeight: 700, color: COLORS.accent2 }}>{emp.name || "Unnamed"}</div>
-                  <div style={{ color: "#666", fontSize: ".97rem" }}>{emp.email}</div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-        <div style={{ marginBottom: 32 }}>
-          <div style={{ fontWeight: 800, fontSize: "1.2rem", color: COLORS.accent, marginBottom: 12 }}>Send message to selected employees</div>
-          <textarea value={multiMessage} onChange={e => setMultiMessage(e.target.value)} rows={3} style={{ width: "100%", borderRadius: 10, border: `1.5px solid ${BORDER}`, padding: 14, fontSize: "1.09rem", marginBottom: 12 }} placeholder="Type your message here..." />
-          <button onClick={sendMultiMessage} disabled={sending || multiSelected.length === 0} style={{ background: COLORS.accent2, color: "#fff", fontWeight: 800, border: "none", borderRadius: 9, padding: "10px 36px", fontSize: "1.07rem", cursor: multiSelected.length === 0 ? "not-allowed" : "pointer", boxShadow: "0 2px 11px #23e09728", opacity: sending ? 0.7 : 1 }}>
-            {sending ? "Sending..." : "Send to Selected"}
+    <PageBackground variant="violet">
+      <div className="mx-auto min-h-screen w-full max-w-6xl px-6 pb-20 pt-10 text-white">
+        <header className="glass-panel rounded-[32px] px-7 py-8">
+          <p className="text-xs uppercase tracking-[0.6em] text-slate-300">
+            Communication hub
+          </p>
+          <h1 className="mt-2 text-4xl font-bold">Messaging Center</h1>
+          <p className="text-sm text-slate-300">
+            Broadcast announcements or chat 1-1 with employees and clients.
+          </p>
+        </header>
+
+        {/* Tabs */}
+        <div className="mt-8 flex gap-2 border-b border-white/10">
+          <button
+            onClick={() => {
+              setActiveTab("employees");
+              setSelectedEmployee(null);
+              setSelectedClient(null);
+              setChatMessages([]);
+            }}
+            className={`px-4 py-2 text-sm font-semibold transition-colors ${
+              activeTab === "employees"
+                ? "border-b-2 border-indigo-400 text-white"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            Employees
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab("clients");
+              setSelectedEmployee(null);
+              setSelectedClient(null);
+              setChatMessages([]);
+            }}
+            className={`px-4 py-2 text-sm font-semibold transition-colors ${
+              activeTab === "clients"
+                ? "border-b-2 border-indigo-400 text-white"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            Clients
           </button>
         </div>
-        {selectedEmployee && (
-          <div style={{ marginBottom: 32 }}>
-            <div style={{ fontWeight: 800, fontSize: "1.2rem", color: COLORS.accent, marginBottom: 12 }}>Chat with {selectedEmployee.name || selectedEmployee.email}</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 22, marginBottom: 18 }}>
-              {chatMessages.length === 0 && (
-                <div style={{ fontSize: "1.2rem", color: COLORS.faded, fontWeight: 700, padding: 32, background: "#f6f9fdcc", borderRadius: 14, textAlign: "center" }}>
-                  No messages yet.
-                </div>
-              )}
-              {chatMessages.map((msg) => (
-                <div key={msg._id} style={{ background: CARD, borderRadius: 14, boxShadow: "0 2px 8px #d2d3f621", padding: "18px 22px", border: `1px solid ${BORDER}` }}>
-                  <div style={{ fontWeight: 700, color: COLORS.accent2, marginBottom: 6 }}>
-                    {msg.sender?.roles?.includes("admin") ? `${msg.sender?.name || "You"} (Admin)` : `${msg.sender?.name || "Employee"}`}
-                  </div>
-                  <div style={{ color: "#333", fontSize: "1.09rem", marginBottom: 4 }}>{msg.content}</div>
-                  <div style={{ color: COLORS.faded, fontSize: ".97rem" }}>{new Date(msg.createdAt).toLocaleString()}</div>
-                </div>
-              ))}
+
+        <div className="mt-10 grid gap-8 lg:grid-cols-[280px,1fr]">
+          <aside className="rounded-[28px] border border-white/10 bg-white/5 p-5">
+            <div className="flex items-center gap-3 text-sm uppercase tracking-[0.4em] text-slate-400">
+              <Users className="h-4 w-4" />
+              {activeTab === "employees" ? "Employees" : "Clients"}
             </div>
-            <textarea value={newMessage} onChange={e => setNewMessage(e.target.value)} rows={3} style={{ width: "100%", borderRadius: 10, border: `1.5px solid ${BORDER}`, padding: 14, fontSize: "1.09rem", marginBottom: 12 }} placeholder="Type your message here..." />
-            <button onClick={sendMessage} disabled={sending} style={{ background: COLORS.accent2, color: "#fff", fontWeight: 800, border: "none", borderRadius: 9, padding: "10px 36px", fontSize: "1.07rem", cursor: "pointer", boxShadow: "0 2px 11px #23e09728", opacity: sending ? 0.7 : 1 }}>
-              {sending ? "Sending..." : "Send Message"}
-            </button>
+            <div className="mt-6 flex flex-col gap-3">
+              {activeTab === "employees" ? (
+                employees.map((emp) => (
+                <label
+                  key={emp._id}
+                  className={`rounded-2xl border px-4 py-3 text-left transition ${
+                    selectedEmployee?._id === emp._id
+                      ? "border-indigo-300 bg-white/10"
+                      : "border-white/10 bg-white/5 hover:border-white/30"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div
+                      className="flex flex-1 cursor-pointer flex-col"
+                      onClick={() => handleSelectEmployee(emp)}
+                    >
+                      <span className="font-semibold text-white">
+                        {emp.name || "Unnamed"}
+                      </span>
+                      <span className="text-xs text-slate-300">
+                        {emp.email}
+                      </span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={multiSelected.includes(emp._id)}
+                      onChange={() => handleMultiSelect(emp._id)}
+                      className="h-4 w-4 accent-indigo-400"
+                    />
+                  </div>
+                </label>
+              ))
+              ) : (
+                clients.map((client) => (
+                  <label
+                    key={client._id}
+                    className={`rounded-2xl border px-4 py-3 text-left transition cursor-pointer ${
+                      selectedClient?._id === client._id
+                        ? "border-indigo-300 bg-white/10"
+                        : "border-white/10 bg-white/5 hover:border-white/30"
+                    }`}
+                    onClick={() => handleSelectClient(client)}
+                  >
+                    <div className="flex flex-col">
+                      <span className="font-semibold text-white">
+                        {client.name || "Unnamed Client"}
+                      </span>
+                      <span className="text-xs text-slate-300">
+                        {client.email}
+                      </span>
+                    </div>
+                  </label>
+                ))
+              )}
+            </div>
+          </aside>
+
+          <div className="space-y-8">
+            {activeTab === "employees" && (
+              <section className="rounded-[32px] border border-white/10 bg-white/5 p-6">
+                <div className="flex items-center gap-3 text-sm uppercase tracking-[0.4em] text-slate-300">
+                  <MessageCircle className="h-5 w-5" />
+                  Broadcast
+                </div>
+                <p className="mt-2 text-sm text-slate-300">
+                  Select multiple employees on the left to send this message.
+                </p>
+                <textarea
+                  rows={3}
+                  value={multiMessage}
+                  onChange={(e) => setMultiMessage(e.target.value)}
+                  className="input-field mt-4 bg-white/10"
+                  placeholder="Type announcement..."
+                />
+                <button
+                  onClick={sendMultiMessage}
+                  disabled={sending || multiSelected.length === 0}
+                  className="btn-primary mt-4 inline-flex w-full justify-center disabled:opacity-60 md:w-auto"
+                >
+                  {sending ? "Sending..." : "Send to selected"}
+                </button>
+              </section>
+            )}
+
+            {(selectedEmployee || selectedClient) ? (
+              <section className="rounded-[32px] border border-white/10 bg-white/5 p-6">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.4em] text-slate-400">
+                      Direct chat
+                    </p>
+                    <h2 className="text-2xl font-semibold text-white">
+                      {selectedEmployee?.name || selectedEmployee?.email || selectedClient?.name || selectedClient?.email}
+                    </h2>
+                  </div>
+                  <span className="rounded-full border border-white/10 px-4 py-2 text-sm text-slate-200">
+                    {chatMessages.length} messages
+                  </span>
+                </div>
+
+                <div className="mt-6 flex max-h-[420px] flex-col gap-4 overflow-y-auto pr-2">
+                  {chatMessages.length === 0 && (
+                    <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-8 text-center text-slate-300">
+                      No messages yet.
+                    </div>
+                  )}
+                  {chatMessages.map((msg) => (
+                    <div
+                      key={msg._id}
+                      className={`rounded-2xl px-5 py-4 text-sm ${
+                        msg.sender?.roles?.includes("admin")
+                          ? "self-end border border-indigo-300/40 bg-indigo-500/20 text-white"
+                          : "self-start border border-white/10 bg-white/5 text-slate-200"
+                      }`}
+                    >
+                      <p className="text-xs uppercase tracking-[0.35em] text-slate-300">
+                        {msg.sender?.roles?.includes("admin")
+                          ? "You"
+                          : msg.sender?.name || (activeTab === "employees" ? "Employee" : "Client")}
+                      </p>
+                      <p className="mt-2 text-base">{msg.content}</p>
+                      <p className="mt-2 text-[11px] text-slate-300">
+                        {new Date(msg.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-6 flex flex-col gap-3 md:flex-row">
+                  <textarea
+                    rows={3}
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    className="input-field flex-1 bg-white/10"
+                    placeholder="Reply..."
+                  />
+                  <button
+                    onClick={sendMessage}
+                    disabled={sending}
+                    className="btn-primary flex items-center justify-center gap-2 md:min-w-[160px]"
+                  >
+                    <Send className="h-4 w-4" />
+                    {sending ? "Sending..." : "Send"}
+                  </button>
+                </div>
+              </section>
+            ) : (
+              <section className="rounded-[32px] border border-dashed border-white/20 bg-white/5 p-10 text-center text-slate-300">
+                Select an {activeTab === "employees" ? "employee" : "client"} to open their conversation timeline.
+              </section>
+            )}
           </div>
-        )}
+        </div>
       </div>
-    </div>
+    </PageBackground>
   );
 }

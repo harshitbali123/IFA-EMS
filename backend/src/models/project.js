@@ -19,6 +19,7 @@ const projectSchema = new mongoose.Schema({
   whatsappGroupLink: String,
   estimatedHoursRequired: Number,
   estimatedHoursTaken: Number,
+  completionPercentage: { type: Number, default: 0, min: 0, max: 100 },
   startDate: Date,
   endDate: Date,
   assignees: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],

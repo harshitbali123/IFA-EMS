@@ -1,14 +1,17 @@
 import express from "express";
 import User from "../models/user.js";
+import { authenticateToken } from "../middlewares/auth.js";
 
 const router = express.Router();
 
-// authenticate token waala function idhr bhi daalna hai 
-
-
-// GET all employees
-router.get("/info", async (req, res) => {
+// GET all employees (admin only)
+router.get("/info", authenticateToken, async (req, res) => {
   try {
+    // Check if user is admin
+    if (!Array.isArray(req.user.roles) || !req.user.roles.includes("admin")) {
+      return res.status(403).json({ error: "Forbidden - Admin access required" });
+    }
+
     const employees = await User.find({ roles: "employee" }).select(
       "name email lastLogin roles"
     );

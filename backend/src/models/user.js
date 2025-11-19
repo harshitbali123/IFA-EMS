@@ -13,6 +13,19 @@ const userSchema = new mongoose.Schema({
     default:"approved",
   },
   
+  // Profile completion fields
+  profileCompleted: { type: Boolean, default: false },
+  phoneNumber: String,
+  dateOfBirth: Date,
+  streetAddress: String,
+  city: String,
+  state: String,
+  pincode: String,
+  designation: String,
+  department: String,
+  joiningDate: Date,
+  skills: [String], // Array of skills
+  
    assignedProjects: [
     {
       type: mongoose.Schema.Types.ObjectId,
@@ -23,9 +36,17 @@ const userSchema = new mongoose.Schema({
 
 //  Only employees get assigned "pending"
 userSchema.pre("save", function (next) {
-  // Only set status to 'pending' for new employees
+  // Only set status to 'pending' for new employees if status is not explicitly set
   if (this.isNew && Array.isArray(this.roles) && this.roles.includes("employee")) {
-    this.status = "pending";
+    // Only set to pending if status is not already explicitly set
+    // This allows the auth route to explicitly set status to "pending" without override
+    if (this.status === undefined || this.status === null) {
+      this.status = "pending";
+    }
+    // If status is "approved" (default), also set to pending for new employees
+    if (this.status === "approved") {
+      this.status = "pending";
+    }
   }
   next();
 });

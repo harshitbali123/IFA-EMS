@@ -1,314 +1,423 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-
-const EMS_BG = "linear-gradient(120deg, #ece9ff 0%, #fdf6fa 65%, #faf7ff 99%)";
-const CARD = "rgba(255,255,255,0.97)";
-const COLORS = {
-  accent: "#8447fb",
-  accent2: "#387efb",
-  accent3: "#19b37a",
-  border: "#e2e4f0"
-};
-
-function Modal({ children, onClose }) {
-  return (
-    <div style={{
-      position: "fixed",
-      top: 0, left: 0, width: "100vw", height: "100vh",
-      background: "rgba(0,0,0,0.21)", backdropFilter: "blur(5px)",
-      display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1200
-    }}>
-      <div style={{
-        minWidth: 370, maxWidth: 820, width: "92%",
-        background: CARD, borderRadius: 18, boxShadow: "0 6px 52px #387efb31",
-        position: "relative", padding: "28px 26px",
-        maxHeight: "80vh", overflowY: "auto"
-      }}>
-        <button
-          style={{
-            position: "absolute", top: 21, right: 22,
-            background: "#ede7fa", color: COLORS.accent, border: "none",
-            borderRadius: 9, fontWeight: 800, fontSize: "1.1rem", cursor: "pointer", padding: "4px 14px"
-          }}
-          onClick={onClose}>✕</button>
-        {children}
-      </div>
-    </div>
-  );
-}
+import {
+  LayoutGrid,
+  Users,
+  Search,
+  Filter,
+  MoreVertical,
+  Calendar,
+  BarChart3,
+  FolderOpen,
+  UserCircle2,
+  LogOut,
+  MessageCircle,
+  Inbox,
+} from "lucide-react";
+import PageBackground from "../components/ui/PageBackground";
 
 export default function AdminDashboard() {
   const [projects, setProjects] = useState([]);
-  const [show, setShow] = useState(null); // for modal preview
-  // Approval system removed
+  const [filteredProjects, setFilteredProjects] = useState([]);
+  const [selectedProject, setSelectedProject] = useState(null);
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     fetch("/api/projects", { credentials: "include" })
-      .then(res => res.json())
-      .then(data => setProjects(data.projects || []));
-    // Approval system removed
+      .then((res) => res.json())
+      .then((data) => {
+        const projs = data.projects || [];
+        setProjects(projs);
+        setFilteredProjects(projs);
+      });
   }, []);
 
-  
+  useEffect(() => {
+    let filtered = [...projects];
 
-  // Logout function
+    // Apply status filter
+    if (filterStatus !== "all") {
+      filtered = filtered.filter((p) => {
+        if (filterStatus === "pending") return p.status === "New" || !p.status;
+        if (filterStatus === "active") return p.status === "Active";
+        if (filterStatus === "completed") return p.status === "Completed";
+        return true;
+      });
+    }
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (p) =>
+          p.projectName?.toLowerCase().includes(query) ||
+          p.clientName?.toLowerCase().includes(query) ||
+          p.description?.toLowerCase().includes(query)
+      );
+    }
+
+    setFilteredProjects(filtered);
+  }, [projects, filterStatus, searchQuery]);
+
   const logout = async () => {
     try {
-      await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
-    } catch (e) { /* ignore */ }
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch (e) {
+      /* ignore */
+    }
     navigate("/");
-  }
+  };
+
+  const stats = [
+    {
+      label: "Total Projects",
+      value: projects.length,
+    },
+    {
+      label: "Team Members",
+      value: new Set(
+        projects.flatMap((p) =>
+          (p.assignees || []).map((a) => a._id || a)
+        )
+      ).size,
+    },
+    {
+      label: "Completed",
+      value: projects.filter((p) => p.status === "Completed").length,
+    },
+    {
+      label: "In Progress",
+      value: projects.filter((p) => p.status === "Active").length,
+    },
+  ];
 
   return (
-    <div style={{
-      minHeight: "100vh", width: "100vw", background: EMS_BG, padding: "0", margin: "0",
-    }}>
-      {/* Top Navbar */}
+    <PageBackground variant="violet">
+      <div className="mx-auto min-h-screen w-full max-w-7xl px-6 pb-20 pt-10 text-white">
+        {/* Top Navigation */}
+        <header className="mb-8 flex flex-col gap-6 border-b border-white/10 pb-6 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.6em] text-slate-300">
+              Admin dashboard
+            </p>
+            <h1 className="mt-2 text-4xl font-bold">Welcome back, Admin</h1>
+            <p className="text-sm text-slate-300">Here's what's happening with your projects today</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative hidden md:block">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search projects..."
+                className="input-field w-64 pl-10"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            <button
+              className="btn-ghost rounded-lg p-2"
+              onClick={() => navigate("/admin/employees")}
+            >
+              <Users className="h-5 w-5" />
+            </button>
+            <button
+              className="btn-ghost rounded-lg p-2"
+              onClick={() => navigate("/admin/messages")}
+            >
+              <MessageCircle className="h-5 w-5" />
+            </button>
+            <button
+              className="btn-ghost rounded-lg p-2"
+              onClick={() => navigate("/admin/requests")}
+            >
+              <Inbox className="h-5 w-5" />
+            </button>
+            <button className="btn-ghost rounded-lg p-2">
+              <UserCircle2 className="h-6 w-6" />
+            </button>
+            <button className="btn-ghost rounded-lg p-2" onClick={logout}>
+              <LogOut className="h-5 w-5" />
+            </button>
+          </div>
+        </header>
 
-      <div style={{
-        height: 75,
-        background: "#ffffffdd",
-        borderBottom: `1px solid ${COLORS.border}`,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "0 46px",
-        boxShadow: "0 3px 12px rgba(0,0,0,0.03)",
-        fontSize: "2rem",
-        fontWeight: 900,
-        color: COLORS.accent,
-      }}>
-        <span style={{
-          fontWeight: 900,
-          fontSize: "2rem",
-          color: COLORS.accent,
-          letterSpacing: "-1px"
-        }}>
-          Admin Dashboard
-        </span>
-        <div style={{ display: "flex", gap: "13px" }}>
-          <button
-            onClick={() => navigate("/admin/requests")}
-            style={{
-              background: COLORS.accent2,
-              color: "#fff",
-              border: "none",
-              borderRadius: 14,
-              padding: "11px 30px",
-              fontWeight: 800,
-              cursor: "pointer",
-              fontSize: "1.08rem",
-              boxShadow: "0 2px 8px #387efb14"
-            }}
-          >
-            Requests
-          </button>
-          <button
-            onClick={() => navigate("/admin/messages")}
-            style={{
-              background: COLORS.accent,
-              color: "#fff",
-              border: "none",
-              borderRadius: 14,
-              padding: "11px 30px",
-              fontWeight: 800,
-              cursor: "pointer",
-              fontSize: "1.08rem",
-              boxShadow: "0 2px 8px #8447fb14"
-            }}
-          >
-            Messages
-          </button>
-          <button
-            onClick={logout}
-            style={{
-              background: "#eee8ff",
-              color: COLORS.accent,
-              border: "none",
-              borderRadius: 14,
-              padding: "11px 30px",
-              fontWeight: 800,
-              cursor: "pointer",
-              fontSize: "1.08rem"
-            }}
-          >
-            Logout
-          </button>
-        </div>
-      </div>
-
-
-      {/* Approval system removed */}
-
-      {/* Projects grid */}
-      <div style={{ maxWidth: 1200, margin: "42px auto 0 auto", padding: "0 22px" }}>
-        <div style={{ fontWeight: 800, fontSize: "2rem", color: COLORS.accent2, marginBottom: 18 }}>
-          All Projects
-        </div>
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(350px, 1fr))",
-          gap: 36
-        }}>
-          {projects.map(project => (
-            <div key={project._id}
-              style={{
-                background: CARD,
-                borderRadius: 18, boxShadow: "0 4px 20px #387efb10",
-                padding: "30px 28px 19px 28px", position: "relative",
-                cursor: "pointer", border: `1px solid ${COLORS.border}`,
-                minHeight: 162, transition: "box-shadow .12s"
-              }}
-              onClick={() => setShow(project)}>
-              <div style={{ fontWeight: 800, fontSize: "1.24rem", color: COLORS.accent }}>
-                {project.projectName}
+        {/* Stats Grid */}
+        <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+          {stats.map((stat, idx) => (
+            <div
+              key={idx}
+              className="glass-card p-6 transition-shadow hover:border-white/20"
+            >
+              <div className="mb-4">
+                <span className="text-sm font-medium text-slate-300">{stat.label}</span>
               </div>
-              <div style={{ color: "#454555dd", fontSize: "1.07rem", fontWeight: 600, marginBottom: 7 }}>
-                Client: {project.clientName} (<span style={{ color: COLORS.accent2, fontWeight: 500 }}>{project.clientEmail}</span>)
-              </div>
-              <div style={{
-                fontWeight: 500, fontSize: "1.07rem", marginBottom: 8
-              }}>
-                <StatusTag status={project.status} />
-                <span style={{ marginLeft: 18, color: COLORS.accent3, fontWeight: 700 }}>
-                  {project.assignees && project.assignees.length ? "Assigned" : "Unassigned"}
-                </span>
-                {project.assignees && project.assignees.length
-                  ? <span style={{ color: "#666", marginLeft: 8 }}>
-                    ({project.assignees.map(a => a.name).join(", ")})
-                  </span>
-                  : null
-                }
-              </div>
-              <div style={{
-                color: "#7c7c9d", fontSize: "1.01rem", marginTop: 8,
-                overflow: "hidden", textOverflow: "ellipsis", maxWidth: 305
-              }}>
-                {project.description}
-              </div>
+              <div className="text-3xl font-bold text-white">{stat.value}</div>
             </div>
           ))}
         </div>
-      </div>
-      {/* Project Preview Modal */}
-      {show &&
-        <Modal onClose={() => setShow(null)}>
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 20, alignItems: "start" }}>
-            {/* Left column: main info */}
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <div>
-                  <h2 style={{ margin: 0, color: COLORS.accent, fontSize: '1.4rem' }}>{show.projectName}</h2>
-                  <div style={{ marginTop: 6, color: COLORS.accent3, fontWeight: 700 }}>{show.clientName} <span style={{ color: '#666', fontWeight: 600 }}>({show.clientEmail})</span></div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ marginBottom: 8 }}><StatusTag status={show.status} /></div>
-                  <div style={{ color: '#666', fontSize: '0.95rem' }}>{show.startDate ? (new Date(show.startDate)).toLocaleDateString() : '-'} — {show.endDate ? (new Date(show.endDate)).toLocaleDateString() : '-'}</div>
-                </div>
+
+        {/* Projects Section */}
+        <div className="rounded-[32px] border border-white/10 bg-white/5">
+          <div className="border-b border-white/10 p-6">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.6em] text-slate-300">
+                  Project portfolio
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold text-white">Active Projects</h2>
+                <p className="mt-1 text-sm text-slate-300">Manage and track your ongoing work</p>
               </div>
-
-              <p style={{ color: '#5b6172', marginTop: 12, lineHeight: 1.6 }}>{show.description}</p>
-
-              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 12 }}>
-                <div style={{ background: '#f8fbff', padding: '10px 14px', borderRadius: 10 }}>
-                  <div style={{ fontWeight: 800, color: '#333', marginBottom: 6 }}>Incharges</div>
-                  <div style={{ color: '#333' }}><b>VA:</b> {show.vaIncharge || '-'}</div>
-                  <div style={{ color: '#333' }}><b>Freelancer:</b> {show.freelancer || '-'}</div>
-                  <div style={{ color: '#333' }}><b>Update:</b> {show.updateIncharge || '-'}</div>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 p-1">
+                  <button
+                    className={`px-3 py-1 text-sm transition-colors ${
+                      filterStatus === "all"
+                        ? "rounded bg-indigo-500/20 text-white"
+                        : "text-slate-300 hover:text-white"
+                    }`}
+                    onClick={() => setFilterStatus("all")}
+                  >
+                    All
+                  </button>
+                  <button
+                    className={`px-3 py-1 text-sm transition-colors ${
+                      filterStatus === "pending"
+                        ? "rounded bg-indigo-500/20 text-white"
+                        : "text-slate-300 hover:text-white"
+                    }`}
+                    onClick={() => setFilterStatus("pending")}
+                  >
+                    Pending
+                  </button>
+                  <button
+                    className={`px-3 py-1 text-sm transition-colors ${
+                      filterStatus === "active"
+                        ? "rounded bg-indigo-500/20 text-white"
+                        : "text-slate-300 hover:text-white"
+                    }`}
+                    onClick={() => setFilterStatus("active")}
+                  >
+                    Active
+                  </button>
+                  <button
+                    className={`px-3 py-1 text-sm transition-colors ${
+                      filterStatus === "completed"
+                        ? "rounded bg-indigo-500/20 text-white"
+                        : "text-slate-300 hover:text-white"
+                    }`}
+                    onClick={() => setFilterStatus("completed")}
+                  >
+                    Completed
+                  </button>
                 </div>
-
-                <div style={{ background: '#f8fbff', padding: '10px 14px', borderRadius: 10 }}>
-                  <div style={{ fontWeight: 800, color: '#333', marginBottom: 6 }}>Hours</div>
-                  <div style={{ color: '#333' }}><b>Estimated:</b> {show.estimatedHoursRequired || '-'}</div>
-                  <div style={{ color: '#333' }}><b>Taken:</b> {show.estimatedHoursTaken || '-'}</div>
-                </div>
-              </div>
-
-              <div style={{ marginTop: 18 }}>
-                <div style={{ fontWeight: 800, marginBottom: 8 }}>Assignees</div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {(show.assignees && show.assignees.length) ? show.assignees.map((a, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#fff', padding: '8px 12px', borderRadius: 999, boxShadow: '0 1px 0 rgba(0,0,0,0.03)' }}>
-                      <div style={{ width: 34, height: 34, borderRadius: 999, background: '#eef3ff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: COLORS.accent2, fontWeight: 800 }}>{((a?.name||a?.email||'') .split(' ')[0]||'')[0] || 'U'}</div>
-                      <div style={{ color: '#333' }}>{a?.name || a?.email || a}</div>
-                    </div>
-                  )) : <div style={{ color: '#666' }}>None</div>}
-                </div>
-              </div>
-
-              <div style={{ marginTop: 18 }}>
-                <div style={{ fontWeight: 800, marginBottom: 6 }}>Lead Assignee</div>
-                <div style={{ color: '#333' }}>{show.leadAssignee?.name || show.leadAssignee || '-'}</div>
+                <button className="btn-primary flex items-center gap-2 px-4 py-2 text-sm">
+                  + New Project
+                </button>
               </div>
             </div>
+          </div>
 
-            {/* Right column: metadata & links */}
-            <aside>
-              <div style={{ background: '#fff', padding: 16, borderRadius: 12, boxShadow: 'inset 0 0 0 1px #f1f4fb' }}>
-                <div style={{ fontWeight: 800, marginBottom: 8 }}>Details</div>
-                <div style={{ color: '#333', marginBottom: 6 }}><b>Priority:</b> {show.priority || '-'}</div>
-                <div style={{ color: '#333', marginBottom: 6 }}><b>Client Type:</b> {show.clientType || '-'}</div>
-                <div style={{ color: '#333', marginBottom: 6 }}><b>Project Type:</b> {show.projectType || '-'}</div>
-
-                <hr style={{ border: 'none', borderTop: '1px solid #f1f4fb', margin: '12px 0' }} />
-
-                <div style={{ fontWeight: 800, marginBottom: 8 }}>Leadership</div>
-                <div style={{ color: '#333', marginBottom: 10 }}>{show.leadership || '-'}</div>
-
-                <div style={{ fontWeight: 800, marginBottom: 8 }}>Coders Recommendation</div>
-                <div style={{ color: '#333', marginBottom: 10 }}>{show.codersRecommendation || '-'}</div>
-
-                <div style={{ fontWeight: 800, marginBottom: 8 }}>Links</div>
-                <div style={{ marginBottom: 6 }}>
-                  <b>GitHub:</b> {show.githubLinks ? <a href={show.githubLinks} target="_blank" rel="noreferrer">Open</a> : '-'}
+          {/* Project List */}
+          <div className="divide-y divide-white/10">
+            {filteredProjects.length === 0 && (
+              <div className="p-10 text-center text-slate-300">
+                {projects.length === 0
+                  ? "No projects yet. Create your first project to get started."
+                  : "No projects match your filters."}
+              </div>
+            )}
+            {filteredProjects.map((project) => (
+              <div
+                key={project._id}
+                className="p-6 transition-colors hover:bg-white/5"
+              >
+                <div className="mb-4 flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-indigo-500/20">
+                      <FolderOpen className="h-6 w-6 text-indigo-300" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-white">{project.projectName}</h3>
+                      <p className="text-sm text-slate-300">{project.clientName}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      className="btn-ghost rounded-lg px-3 py-1 text-sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedProject(project);
+                        setShowDetailsModal(true);
+                      }}
+                    >
+                      View Details
+                    </button>
+                    <button
+                      className="rounded-lg p-2 hover:bg-white/10"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/admin/project/${project._id}`);
+                      }}
+                    >
+                      <MoreVertical className="h-5 w-5 text-slate-400" />
+                    </button>
+                  </div>
                 </div>
-                <div style={{ marginBottom: 6 }}>
-                  <b>Loom:</b> {show.loomLink ? <a href={show.loomLink} target="_blank" rel="noreferrer">Open</a> : '-'}
+
+                <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-4">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`h-2 w-2 rounded-full ${
+                        project.status === "Active"
+                          ? "bg-blue-400"
+                          : project.status === "Completed"
+                            ? "bg-emerald-400"
+                            : "bg-slate-400"
+                      }`}
+                    ></span>
+                    <span className="text-sm text-slate-300">{project.status}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-slate-400" />
+                    <span className="text-sm text-slate-300">
+                      {project.assignees?.length || 0} members
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-slate-400" />
+                    <span className="text-sm text-slate-300">
+                      {project.startDate
+                        ? new Date(project.startDate).toLocaleDateString()
+                        : "No date"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4 text-slate-400" />
+                    <span className="text-sm text-slate-300">
+                      {project.estimatedHoursTaken || 0}h logged
+                    </span>
+                  </div>
                 </div>
-                <div>
-                  <b>WhatsApp:</b> {show.whatsappGroupLink ? <a href={show.whatsappGroupLink} target="_blank" rel="noreferrer">Open</a> : '-'}
+
+                <div className="text-sm text-slate-300">
+                  {project.description || "No description"}
                 </div>
               </div>
-            </aside>
+            ))}
           </div>
+        </div>
+      </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: 18 }}>
-            <button onClick={() => navigate(`/admin/project/${show._id}`)} style={{ background: COLORS.accent2, color: '#fff', border: 'none', padding: '10px 28px', borderRadius: 10, fontWeight: 800, cursor: 'pointer' }}>Edit</button>
+      {/* Project Details Modal */}
+      {showDetailsModal && selectedProject && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-8 backdrop-blur-md">
+          <div className="glass-panel relative w-full max-w-3xl rounded-[32px] px-8 py-8">
+            <button
+              onClick={() => {
+                setShowDetailsModal(false);
+                setSelectedProject(null);
+              }}
+              className="absolute right-6 top-6 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10"
+            >
+              Close
+            </button>
+            <div className="space-y-6">
+              <div>
+                <p className="text-xs uppercase tracking-[0.6em] text-slate-300">Project Details</p>
+                <h2 className="mt-2 text-3xl font-bold text-white">{selectedProject.projectName}</h2>
+              </div>
+
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <div>
+                  <p className="text-sm text-slate-300">Client Name</p>
+                  <p className="mt-1 text-white">{selectedProject.clientName || "N/A"}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-slate-300">Client Email</p>
+                  <p className="mt-1 text-white">{selectedProject.clientEmail || "N/A"}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-slate-300">Status</p>
+                  <p className="mt-1 text-white">{selectedProject.status || "New"}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-slate-300">Priority</p>
+                  <p className="mt-1 text-white">{selectedProject.priority || "Normal"}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-slate-300">Start Date</p>
+                  <p className="mt-1 text-white">
+                    {selectedProject.startDate
+                      ? new Date(selectedProject.startDate).toLocaleDateString()
+                      : "Not set"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-slate-300">End Date</p>
+                  <p className="mt-1 text-white">
+                    {selectedProject.endDate
+                      ? new Date(selectedProject.endDate).toLocaleDateString()
+                      : "Not set"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-slate-300">Estimated Hours</p>
+                  <p className="mt-1 text-white">
+                    {selectedProject.estimatedHoursRequired || 0}h
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-slate-300">Hours Logged</p>
+                  <p className="mt-1 text-white">
+                    {selectedProject.estimatedHoursTaken || 0}h
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-sm text-slate-300">Description</p>
+                <p className="mt-2 text-white">{selectedProject.description || "No description"}</p>
+              </div>
+
+              <div>
+                <p className="text-sm text-slate-300 mb-2">Assigned Employees</p>
+                <div className="flex flex-wrap gap-2">
+                  {selectedProject.assignees && selectedProject.assignees.length > 0 ? (
+                    selectedProject.assignees.map((assignee, idx) => (
+                      <span
+                        key={idx}
+                        className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-white"
+                      >
+                        {assignee.name || assignee.email}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-slate-400">No employees assigned</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  className="btn-primary flex-1"
+                  onClick={() => {
+                    setShowDetailsModal(false);
+                    navigate(`/admin/project/${selectedProject._id}`);
+                  }}
+                >
+                  Edit Project
+                </button>
+              </div>
+            </div>
           </div>
-        </Modal>
-      }
-    </div>
-  );
-}
-
-// Colored status tag
-function StatusTag({ status }) {
-  const COLORS = {
-    Completed: "#19b37a",
-    Cancelled: "#d82929",
-    "Client Meeting Done": "#e0c058",
-    "Contact Made": "#6699a2",
-    Active: "#2262fb",
-    Recontacted: "#a47aff",
-    Stalled: "#666",
-    "Requirements Sent": "#dc6060",
-    "Waiting for Requirement": "#aaa",
-    "Awaiting Testimonial": "#c68967",
-    Training: "#6c53b7",
-    New: "#387efb"
-  };
-  return (
-    <span style={{
-      background: COLORS[status] || "#b2b2b2",
-      color: "#fff",
-      borderRadius: "8px",
-      fontSize: "0.99rem",
-      fontWeight: 700,
-      padding: "4px 16px",
-      marginRight: 10
-    }}>
-      {status}
-    </span>
+        </div>
+      )}
+    </PageBackground>
   );
 }

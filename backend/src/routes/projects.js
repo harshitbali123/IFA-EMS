@@ -61,6 +61,35 @@ router.get("/", authenticateToken, async (req, res) => {
   }
 });
 
+// Get projects by employee ID (admin only)
+router.get("/employee/:employeeId", authenticateToken, async (req, res) => {
+  try {
+    if (!Array.isArray(req.user.roles) || !req.user.roles.includes("admin")) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    
+    const { employeeId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(employeeId)) {
+      return res.status(400).json({ error: "Invalid employee ID" });
+    }
+
+    const projects = await Project.find({
+      $or: [
+        { assignees: employeeId },
+        { leadAssignee: employeeId }
+      ]
+    })
+      .populate("assignees", "name email")
+      .populate("leadAssignee", "name email")
+      .sort({ createdAt: -1 });
+
+    res.json({ projects });
+  } catch (err) {
+    console.error("Error fetching employee projects:", err);
+    res.status(500).json({ error: "Failed to fetch employee projects" });
+  }
+});
+
 // Update a project (admin only)
 router.put("/:id", authenticateToken, async (req, res) => {
   try {
@@ -76,6 +105,7 @@ router.put("/:id", authenticateToken, async (req, res) => {
       "projectType",
       "estimatedHoursRequired",
       "estimatedHoursTaken",
+      "completionPercentage",
       "startDate",
       "endDate",
       "assignees",
@@ -112,6 +142,21 @@ router.put("/:id", authenticateToken, async (req, res) => {
             } catch {
               proj.assignees = [];
             }
+          }
+        } else if (key === "completionPercentage") {
+          const percentage = Math.max(0, Math.min(100, Number(req.body[key])));
+          proj[key] = percentage;
+          // Auto-set status based on percentage
+          if (percentage === 100) {
+            proj.status = "Completed";
+          } else if (percentage > 0) {
+            // If percentage is between 1-99%, set to "Active" if it was "Completed"
+            if (proj.status === "Completed") {
+              proj.status = "Active";
+            }
+          } else {
+            // If percentage is 0%, set to "New"
+            proj.status = "New";
           }
         } else {
           proj[key] = req.body[key];

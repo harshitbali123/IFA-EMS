@@ -33,60 +33,93 @@ router.post("/google", async (req, res) => {
 
     // find user in database 
     let dbUser = await User.findOne({ email: user.email });
+    let isNewUser = false;
 
     // if user is not in database create user 
     if (!dbUser) {
+      isNewUser = true;
+      // Set status before creating user - employees default to pending
+      const initialStatus = (isAdmin || role === "client") ? "approved" : "pending";
+      
       dbUser = new User({ 
         email: user.email, 
         roles: [role], 
         name: user.name, 
         picture: user.picture,
         lastLogin: Date.now(),
-        status:(isAdmin || role === "client") ? "approved" : "pending",
+        status: initialStatus,
       });
 
       await dbUser.save();
 
-      // if employee -- back login 
-      if(!isAdmin && role ==="employee"){
-        return res.json({
-          success:false,
-          pending:true,
-          message:"Your account is pending approval by admin.",
-        });
+      // if new employee and not admin -- redirect to pending approval
+      // Re-fetch to ensure we have the actual saved status (after pre-save hook)
+      dbUser = await User.findById(dbUser._id);
+      
+      // For new employees, check if they need approval
+      // All new employees (except admins signing in as employee) need approval
+      if (role === "employee") {
+        console.log("New employee sign-in - Status:", dbUser.status, "isAdmin:", isAdmin, "Email:", user.email);
+        // Only allow sign-in if status is "approved" OR if user is an admin email
+        if (dbUser.status !== "approved" && !isAdmin) {
+          console.log("Blocking sign-in - employee not approved");
+          // Clear any cookies that might have been set
+          const isProd = process.env.NODE_ENV === "production";
+          res.clearCookie("ems_token", {
+            httpOnly: true,
+            secure: isProd,
+            sameSite: isProd ? "strict" : "lax"
+          });
+          res.clearCookie("ems_role", {
+            httpOnly: false,
+            secure: isProd,
+            sameSite: isProd ? "strict" : "lax"
+          });
+          console.log("Returning pending response for new employee");
+          return res.json({
+            success: false,
+            pending: true,
+            message: "Your account is pending approval by admin.",
+          });
+        } else {
+          console.log("Allowing sign-in - employee approved or is admin");
+        }
       }
+    } else {
+      // Update existing user
+      dbUser.lastLogin = Date.now();
+      dbUser.name = user.name;
+      dbUser.picture = user.picture;
+      if (!dbUser.roles.includes(role)) dbUser.roles.push(role);
+      await dbUser.save();
 
-      // dbUser.lastLogin = Date.now();
-      // if (!dbUser.roles.includes(role)) dbUser.roles.push(role);
-      // dbUser.name = user.name;
-      // dbUser.picture = user.picture;
-      // Approval system removed
-    } 
-    // else {
-    //   dbUser.lastLogin = Date.now();
-    //   if (!dbUser.roles.includes(role)) dbUser.roles.push(role);
-    //   dbUser.name = user.name;
-    //   dbUser.picture = user.picture;
-    //   // Approval system removed
-    // }
-
-
-    //update existing user 
-
-    dbUser.lastLogin = Date.now();
-    dbUser.name = user.name;
-    dbUser.picture = user.picture;
-    if (!dbUser.roles.includes(role)) dbUser.roles.push(role);
-
-    await dbUser.save();
-
-
-    if(role === "employee" && dbUser.status!=="approved"){
-      return res.json({
-        success:false,
-        pending:true,
-        message:"Your account is pending approval by admin."
-      })
+      // Re-fetch to ensure we have the latest status
+      dbUser = await User.findById(dbUser._id);
+      
+      // Check if existing employee is approved - must be approved to sign in
+      if (role === "employee") {
+        console.log("Existing employee sign-in - Status:", dbUser.status);
+        if (dbUser.status !== "approved") {
+          // Clear any cookies that might have been set
+          const isProd = process.env.NODE_ENV === "production";
+          res.clearCookie("ems_token", {
+            httpOnly: true,
+            secure: isProd,
+            sameSite: isProd ? "strict" : "lax"
+          });
+          res.clearCookie("ems_role", {
+            httpOnly: false,
+            secure: isProd,
+            sameSite: isProd ? "strict" : "lax"
+          });
+          console.log("Returning pending response for existing employee");
+          return res.json({
+            success: false,
+            pending: true,
+            message: "Your account is pending approval by admin.",
+          });
+        }
+      }
     }
 
     // Create JWT token - read JWT_SECRET at runtime

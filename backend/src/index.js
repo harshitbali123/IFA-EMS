@@ -13,6 +13,7 @@ import progressRoutes from "./routes/progress.js";
 import employeeInfo from "./routes/employeeinfo.js"
 import requests from "./routes/admin.js"
 import messagesRoutes from "./routes/messages.js"
+import dailyFormRoutes from "./routes/dailyForms.js"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -45,6 +46,7 @@ app.use("/api/progress", progressRoutes);
 app.use("/api/employees",employeeInfo);
 app.use("/api/requests",requests);
 app.use("/api/messages", messagesRoutes);
+app.use("/api/daily-forms", dailyFormRoutes);
 
 
 const PORT = process.env.PORT || 5000;

@@ -1,17 +1,6 @@
 import React, { useState, useEffect } from "react";
-
-const EMS_BG = "linear-gradient(120deg,#ede7fe 0%, #f6f7fa 57%, #e8e9ff 100%)";
-const CARD = "rgba(255,255,255,0.98)";
-const CARD_SHADOW = "0 7px 32px #886ef210, 0 2px 8px #d2d3f621";
-const BORDER = "#e4e1f8";
-const COLORS = {
-  accent: "#7659e7",
-  accent2: "#26a9e0",
-  success: "#12b48b",
-  reject: "#e26c5c",
-  faded: "#8577bc",
-  pending: "#dbad4c",
-};
+import { UserPlus, Check, X } from "lucide-react";
+import PageBackground from "../components/ui/PageBackground";
 
 export default function AdminRequestsPage() {
   const [requests, setRequests] = useState([]);
@@ -24,13 +13,9 @@ export default function AdminRequestsPage() {
           setRequests(data.requests);
         } else {
           setRequests([]);
-          console.warn("No requests or invalid format from backend API");
         }
       })
-      .catch((err) => {
-        console.error("Fetching requests failed", err);
-        setRequests([]);
-      });
+      .catch(() => setRequests([]));
   }, []);
 
   const handleAction = async (id, action) => {
@@ -39,223 +24,134 @@ export default function AdminRequestsPage() {
         action === "approved"
           ? `/api/requests/approve/${id}`
           : `/api/requests/reject/${id}`;
-      const method = "PUT";
-
-      const res = await fetch(endpoint, { method, credentials: "include" });
+      const res = await fetch(endpoint, { method: "PUT", credentials: "include" });
       if (!res.ok) throw new Error("Failed to update status");
-
       setRequests((prev) =>
-        prev.map((req) =>
-          req._id === id ? { ...req, status: action } : req
-        )
+        prev.map((req) => (req._id === id ? { ...req, status: action } : req)),
       );
     } catch (error) {
-      console.error("Error updating request status:", error);
       alert("Failed to update request status. Please try again.");
     }
   };
 
   const requestsList = Array.isArray(requests) ? requests : [];
+  const pending = requestsList.filter((req) => req.status === "pending").length;
+  const approved = requestsList.filter((req) => req.status === "approved").length;
+  const rejected = requestsList.filter((req) => req.status === "rejected").length;
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        width: "100vw",
-        background: EMS_BG,
-        padding: 0,
-        margin: 0,
-        fontFamily: "Inter, 'Segoe UI', Arial, sans-serif",
-      }}
-    >
-      <div
-        style={{
-          height: 75,
-          background: "#fff",
-          borderBottom: `1.5px solid ${BORDER}`,
-          display: "flex",
-          alignItems: "center",
-          padding: "0 55px",
-          fontSize: "2.17rem",
-          fontWeight: 900,
-          color: COLORS.accent,
-          boxShadow: "0 2px 13px #e3e3fa21",
-        }}
-      >
-        New Employee Requests
-      </div>
-      <div
-        style={{
-          maxWidth: 1100,
-          margin: "54px auto",
-          padding: "0 22px",
-        }}
-      >
-        <div
-          style={{
-            fontWeight: 800,
-            fontSize: "1.45rem",
-            color: COLORS.accent2,
-            marginBottom: "2.3rem",
-            letterSpacing: "-0.5px",
-          }}
-        >
-          Pending Approvals
-        </div>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))",
-            gap: 34,
-          }}
-        >
-          {requestsList.length === 0 && (
-            <div
-              style={{
-                fontSize: "1.34rem",
-                color: COLORS.faded,
-                fontWeight: 700,
-                padding: 48,
-                background: "#f6f9fdcc",
-                borderRadius: 18,
-                textAlign: "center",
-              }}
-            >
-              No new employee requests at the moment.
-              <br />
-              🎉 All current employees are active!
+    <PageBackground variant="violet">
+      <div className="mx-auto min-h-screen w-full max-w-5xl px-6 pb-20 pt-10 text-white">
+        <header className="flex flex-col gap-6 border-b border-white/10 pb-6 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.6em] text-slate-300">
+              Access pipeline
+            </p>
+            <h1 className="mt-2 text-4xl font-bold">Request matrix</h1>
+            <p className="text-sm text-slate-300">
+              Vet pending registrations and unlock dashboards instantly.
+            </p>
+          </div>
+          <div className="flex gap-4 text-sm text-slate-200">
+            <StatPill label="Pending" value={pending} tone="text-amber-200" />
+            <StatPill label="Approved" value={approved} tone="text-emerald-200" />
+            <StatPill label="Rejected" value={rejected} tone="text-rose-200" />
+          </div>
+        </header>
+
+        <section className="mt-12 space-y-8">
+          <div className="rounded-[32px] border border-white/10 bg-white/5">
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 px-6 py-6">
+              <div>
+                <p className="text-xs uppercase tracking-[0.6em] text-slate-400">
+                  Pending approvals
+                </p>
+                <h2 className="text-3xl font-semibold">People waiting</h2>
+              </div>
+              <span className="rounded-full border border-white/10 px-5 py-2 text-sm text-slate-200">
+                {requestsList.length} requests
+              </span>
             </div>
-          )}
 
-          {requestsList.map((req) => (
-            <div
-              key={req._id}
-              style={{
-                background: CARD,
-                borderRadius: 19,
-                boxShadow: CARD_SHADOW,
-                padding: "36px 28px 30px",
-                border: `1.5px solid ${BORDER}`,
-                position: "relative",
-                minHeight: 190,
-                transition: "box-shadow .11s",
-                opacity: req.status === "pending" ? 1 : 0.7,
-              }}
-            >
-              <div
-                style={{ display: "flex", alignItems: "center", marginBottom: 14 }}
-              >
-                <img
-                  src={req.picture || ""}
-                  alt={req.name || "User"}
-                  onError={(e) => {
-                    e.target.onerror = null;
-                    e.target.src =
-                      "https://via.placeholder.com/54?text=User";
-                  }}
-                  style={{
-                    width: 54,
-                    height: 54,
-                    borderRadius: "50%",
-                    marginRight: 16,
-                    border: `2.5px solid ${COLORS.accent}`,
-                    boxShadow: "0 2px 9px #9789e840",
-                    objectFit: "cover",
-                  }}
-                />
-                <div>
-                  <div
-                    style={{
-                      fontWeight: 800,
-                      fontSize: "1.27rem",
-                      color: COLORS.accent2,
-                    }}
-                  >
-                    {req.name || "Unnamed User"}
-                  </div>
-                  <div
-                    style={{ fontSize: "1.07rem", color: "#a889ed", fontWeight: 600 }}
-                  >
-                    {req.email || "No email"}
-                  </div>
-                </div>
-              </div>
-
-              <div
-                style={{
-                  color: COLORS.faded,
-                  fontWeight: 600,
-                  fontSize: "1.09rem",
-                  marginBottom: 7,
-                  lineHeight: 1.42,
-                }}
-              >
-                <span style={{ color: "#653cdb" }}>Reason:</span>{" "}
-                {req.comment || (
-                  <span style={{ opacity: 0.5, fontStyle: "italic" }}>
-                    No comment
-                  </span>
-                )}
-              </div>
-              <div style={{ fontSize: ".97rem", color: COLORS.pending, marginBottom: 18 }}>
-                Requested:{" "}
-                {req.createdAt
-                  ? new Date(req.createdAt).toLocaleString()
-                  : "Unknown"}
-              </div>
-              {req.status === "pending" ? (
-                <div style={{ display: "flex", gap: 18, marginTop: 7 }}>
-                  <button
-                    onClick={() => handleAction(req._id, "approved")}
-                    style={{
-                      background:
-                        "linear-gradient(90deg,#51e3b6 20%,#2eca8b 100%)",
-                      color: "#fff",
-                      fontWeight: 800,
-                      border: "none",
-                      borderRadius: 9,
-                      padding: "10px 36px",
-                      fontSize: "1.07rem",
-                      cursor: "pointer",
-                      boxShadow: "0 2px 11px #23e09728",
-                    }}
-                  >
-                    Approve
-                  </button>
-                  <button
-                    onClick={() => handleAction(req._id, "rejected")}
-                    style={{
-                      background:
-                        "linear-gradient(90deg,#f79969 5%,#e26c5c 100%)",
-                      color: "#fff",
-                      fontWeight: 600,
-                      border: "none",
-                      borderRadius: 9,
-                      padding: "10px 22px",
-                      fontSize: "1.07rem",
-                      cursor: "pointer",
-                      boxShadow: "0 2px 11px #e56c5c2a",
-                    }}
-                  >
-                    Reject
-                  </button>
-                </div>
-              ) : (
-                <div
-                  style={{
-                    marginTop: 18,
-                    fontWeight: 800,
-                    color: req.status === "approved" ? COLORS.success : COLORS.reject,
-                    fontSize: "1.09rem",
-                  }}
-                >
-                  {req.status === "approved" ? "✔ Approved" : "❌ Rejected"}
+            <div className="divide-y divide-white/10">
+              {requestsList.length === 0 && (
+                <div className="px-6 py-10 text-center text-slate-200">
+                  All caught up. There are no pending employee requests right now.
                 </div>
               )}
+              {requestsList.map((req) => (
+                <article
+                  key={req._id}
+                  className={`px-6 py-6 transition hover:bg-white/5 ${
+                    req.status !== "pending" ? "opacity-70" : ""
+                  }`}
+                >
+                  <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-4">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-xl font-semibold">
+                          {(req.name || req.email || "?").charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="text-lg font-semibold">{req.name || "Unnamed"}</p>
+                          <p className="text-sm text-slate-300">{req.email || "No email"}</p>
+                        </div>
+                      </div>
+                      <div className="rounded-2xl border border-white/5 bg-white/5 px-4 py-3 text-sm text-slate-200">
+                        {req.comment || "No justification provided"}
+                      </div>
+                      <p className="text-xs uppercase tracking-[0.4em] text-slate-400">
+                        Requested {req.createdAt ? new Date(req.createdAt).toLocaleString() : "Unknown"}
+                      </p>
+                    </div>
+                    <div className="flex flex-col gap-3 lg:min-w-[240px]">
+                      {req.status === "pending" ? (
+                        <>
+                          <button
+                            className="btn-primary justify-center bg-gradient-to-r from-emerald-500 to-emerald-400"
+                            onClick={() => handleAction(req._id, "approved")}
+                          >
+                            <Check className="mr-2 h-4 w-4" />
+                            Approve
+                          </button>
+                          <button
+                            className="btn-ghost justify-center border-rose-400/40 text-rose-100"
+                            onClick={() => handleAction(req._id, "rejected")}
+                          >
+                            <X className="mr-2 h-4 w-4" />
+                            Reject
+                          </button>
+                        </>
+                      ) : (
+                        <div
+                          className={`rounded-2xl border px-4 py-2 text-center text-sm font-semibold ${
+                            req.status === "approved"
+                              ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-100"
+                              : "border-rose-400/30 bg-rose-400/10 text-rose-100"
+                          }`}
+                        >
+                          {req.status === "approved" ? "Approved" : "Rejected"}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <UserPlus className="mt-6 h-5 w-5 text-slate-500" />
+                </article>
+              ))}
             </div>
-          ))}
-        </div>
+          </div>
+        </section>
       </div>
-    </div>
+    </PageBackground>
+  );
+}
+
+function StatPill({ label, value, tone }) {
+  return (
+    <span
+      className={`rounded-full border border-white/10 px-4 py-2 text-xs uppercase tracking-[0.4em] ${tone}`}
+    >
+      {label}: {value}
+    </span>
   );
 }
