@@ -4,15 +4,9 @@ import { GoogleOAuthProvider, GoogleLogin } from "@react-oauth/google";
 import { ArrowLeft, Shield, LockKeyhole, Sparkles } from "lucide-react";
 import PageBackground from "../components/ui/PageBackground";
 
-const FALLBACK_GOOGLE_CLIENT_ID =
-  "566747438493-3k78i9n08q85ucmeq33tlof9kq53n1fb.apps.googleusercontent.com";
 const GOOGLE_CLIENT_ID =
-  import.meta.env.VITE_GOOGLE_CLIENT_ID || FALLBACK_GOOGLE_CLIENT_ID;
-if (!import.meta.env.VITE_GOOGLE_CLIENT_ID) {
-  console.warn(
-    "VITE_GOOGLE_CLIENT_ID is missing. Falling back to the default development client ID.",
-  );
-}
+  import.meta.env.VITE_GOOGLE_CLIENT_ID ||
+  "566747438493-3k78i9n08q85ucmeq33tlof9kq53n1fb.apps.googleusercontent.com";
 
 const roleCopy = {
   admin: {
