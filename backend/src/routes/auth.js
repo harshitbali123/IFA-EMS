@@ -6,6 +6,19 @@ import User from "../models/user.js";
 const router = express.Router();
 const ADMIN_EMAILS = ["piyush31221@gmail.com","harshitbali320@gmail.com"]; // Your admin emails
 
+const isProduction = process.env.NODE_ENV === "production";
+const cookieSameSite =
+  (process.env.COOKIE_SAME_SITE || "").toLowerCase() ||
+  (isProduction ? "none" : "lax");
+const cookieDomain = process.env.COOKIE_DOMAIN || undefined;
+
+const buildCookieOptions = (overrides = {}) => ({
+  secure: isProduction,
+  sameSite: cookieSameSite,
+  ...(cookieDomain ? { domain: cookieDomain } : {}),
+  ...overrides,
+});
+
 async function verifyGoogleToken(token) {
   const response = await axios.get(`https://oauth2.googleapis.com/tokeninfo?id_token=${token}`);
   if (!response.data.aud || response.data.aud !== process.env.GOOGLE_CLIENT_ID) {
@@ -64,17 +77,8 @@ router.post("/google", async (req, res) => {
         if (dbUser.status !== "approved" && !isAdmin) {
           console.log("Blocking sign-in - employee not approved");
           // Clear any cookies that might have been set
-          const isProd = process.env.NODE_ENV === "production";
-          res.clearCookie("ems_token", {
-            httpOnly: true,
-            secure: isProd,
-            sameSite: isProd ? "strict" : "lax"
-          });
-          res.clearCookie("ems_role", {
-            httpOnly: false,
-            secure: isProd,
-            sameSite: isProd ? "strict" : "lax"
-          });
+          res.clearCookie("ems_token", buildCookieOptions({ httpOnly: true }));
+          res.clearCookie("ems_role", buildCookieOptions());
           console.log("Returning pending response for new employee");
           return res.json({
             success: false,
@@ -101,17 +105,8 @@ router.post("/google", async (req, res) => {
         console.log("Existing employee sign-in - Status:", dbUser.status);
         if (dbUser.status !== "approved") {
           // Clear any cookies that might have been set
-          const isProd = process.env.NODE_ENV === "production";
-          res.clearCookie("ems_token", {
-            httpOnly: true,
-            secure: isProd,
-            sameSite: isProd ? "strict" : "lax"
-          });
-          res.clearCookie("ems_role", {
-            httpOnly: false,
-            secure: isProd,
-            sameSite: isProd ? "strict" : "lax"
-          });
+          res.clearCookie("ems_token", buildCookieOptions({ httpOnly: true }));
+          res.clearCookie("ems_role", buildCookieOptions());
           console.log("Returning pending response for existing employee");
           return res.json({
             success: false,
@@ -130,20 +125,23 @@ router.post("/google", async (req, res) => {
     const tokenPayload = { userId: dbUser._id, email: user.email, roles: dbUser.roles, name: user.name, picture: user.picture };
     const jwtToken = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: "1d" });
 
-    // Set cookies. In development we must not set `secure: true` so cookies are allowed over http.
-    const isProd = process.env.NODE_ENV === "production";
-    res.cookie("ems_token", jwtToken, {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: isProd ? "strict" : "lax",
-      maxAge: 24 * 60 * 60 * 1000
-    });
-    res.cookie("ems_role", role, {
-      httpOnly: false,
-      secure: isProd,
-      sameSite: isProd ? "strict" : "lax",
-      maxAge: 24 * 60 * 60 * 1000
-    });
+    // Set cookies. In production we default to SameSite=None for cross-domain deployments (Render + Vercel).
+    res.cookie(
+      "ems_token",
+      jwtToken,
+      buildCookieOptions({
+        httpOnly: true,
+        maxAge: 24 * 60 * 60 * 1000,
+      }),
+    );
+    res.cookie(
+      "ems_role",
+      role,
+      buildCookieOptions({
+        httpOnly: false,
+        maxAge: 24 * 60 * 60 * 1000,
+      }),
+    );
 
     res.json({ success: true, ...tokenPayload });
 
@@ -154,17 +152,8 @@ router.post("/google", async (req, res) => {
 });
 
 router.post("/logout", (req, res) => {
-  const isProd = process.env.NODE_ENV === "production";
-  res.clearCookie("ems_token", {
-    httpOnly: true,
-    secure: isProd,
-    sameSite: isProd ? "strict" : "lax"
-  });
-  res.clearCookie("ems_role", {
-    httpOnly: false,
-    secure: isProd,
-    sameSite: isProd ? "strict" : "lax"
-  });
+  res.clearCookie("ems_token", buildCookieOptions({ httpOnly: true }));
+  res.clearCookie("ems_role", buildCookieOptions());
   res.json({ success: true });
 });
 

@@ -1,8 +1,25 @@
 import { Server } from "socket.io";
 import jwt from "jsonwebtoken";
+import dotenv from "dotenv";
+dotenv.config();
 import Message from "./models/message.js";
 
 let ioInstance = null;
+
+const parseOrigins = (raw) =>
+  (raw || "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+const DEFAULT_ORIGINS = ["http://localhost:5173"];
+const configuredOrigins = parseOrigins(process.env.CORS_ORIGINS);
+const fallbackOrigins = parseOrigins(process.env.FRONTEND_URL);
+const allowedOrigins = configuredOrigins.length
+  ? configuredOrigins
+  : fallbackOrigins.length
+    ? fallbackOrigins
+    : DEFAULT_ORIGINS;
 
 const getCookieValue = (cookieHeader = "", name) => {
   return cookieHeader
@@ -19,11 +36,9 @@ const getCookieValue = (cookieHeader = "", name) => {
 };
 
 export const initSocketServer = (server) => {
-  const allowedOrigin = process.env.FRONTEND_URL || "http://localhost:5173";
-
   ioInstance = new Server(server, {
     cors: {
-      origin: allowedOrigin,
+      origin: allowedOrigins,
       credentials: true,
     },
   });
