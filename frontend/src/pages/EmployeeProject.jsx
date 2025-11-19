@@ -37,8 +37,7 @@ export default function EmployeeProject() {
 
   const logout = async () => {
     try {
-      const apiBase = "http://localhost:5000";
-      await fetch(`${apiBase}/api/auth/logout`, {
+      await fetch("/api/auth/logout", {
         method: "POST",
         credentials: "include",
       });
@@ -49,9 +48,7 @@ export default function EmployeeProject() {
   };
 
   useEffect(() => {
-    const apiBase = "http://localhost:5000";
-
-    fetch(`${apiBase}/api/projects`, { credentials: "include" })
+    fetch("/api/projects", { credentials: "include" })
       .then((res) => res.json())
       .then((data) => {
         const proj = (data.projects || []).find((x) => x._id === id);
@@ -61,7 +58,7 @@ export default function EmployeeProject() {
         }
       });
 
-    fetch(`${apiBase}/api/progress/${id}`, { credentials: "include" })
+    fetch(`/api/progress/${id}`, { credentials: "include" })
       .then(async (res) => {
         if (!res.ok) {
           setProgressHistory([]);
@@ -75,9 +72,7 @@ export default function EmployeeProject() {
   const submitReport = async (e) => {
     e.preventDefault();
     setSubmitting(true);
-    const apiBase = "http://localhost:5000";
-
-    const resp = await fetch(`${apiBase}/api/progress/${id}`, {
+    const resp = await fetch(`/api/progress/${id}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -92,7 +87,7 @@ export default function EmployeeProject() {
       setReportText("");
       setShowReport(false);
       // Refresh project to get updated completion percentage
-      fetch(`${apiBase}/api/projects`, { credentials: "include" })
+      fetch("/api/projects", { credentials: "include" })
         .then((res) => res.json())
         .then((data) => {
           const proj = (data.projects || []).find((x) => x._id === id);
@@ -101,7 +96,7 @@ export default function EmployeeProject() {
             setCompletionPercentage(proj.completionPercentage || 0);
           }
         });
-      fetch(`${apiBase}/api/progress/${id}`, { credentials: "include" })
+      fetch(`/api/progress/${id}`, { credentials: "include" })
         .then((res) => res.json())
         .then((data) => setProgressHistory(data?.progress || []));
     } else {
